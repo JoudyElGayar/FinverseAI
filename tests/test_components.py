@@ -59,3 +59,15 @@ def test_perf_and_bootstrap():
     assert m["months"] == 60 and -1 < m["max_drawdown"] <= 0
     d = block_bootstrap_diff(r, r, reps=50)
     assert abs(d["sharpe_diff"]) < 1e-12 and d["ci_low"] <= 0 <= d["ci_high"]
+
+
+def test_writer_numbers_guard():
+    from finverse.explain.writer import TemplateWriter, LLMWriter, check_numbers
+    e = {"date": "2020-01-31", "regime_prob": {"0": 0.7, "1": 0.3}, "agent_weights": {"a": 0.6, "b": 0.4},
+         "holdings": [{"stock": "X", "weight": 0.1, "combined_score": 0.8, "agent_scores": {"a": 0.9, "b": 0.6},
+                       "disagreement": 0.3, "counterfactual_weight_change_if_agent_removed": {"a": -0.02}}]}
+    t = TemplateWriter().write(e)
+    assert "10.0%" in t and "0.80" in t
+    assert not check_numbers(t + " 99", t)
+    assert LLMWriter(lambda p: "Invented 77 percent").write(e) == t
+    assert LLMWriter(lambda p: p.split("\n\n", 1)[1]).write(e) == t

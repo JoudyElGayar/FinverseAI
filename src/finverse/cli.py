@@ -99,6 +99,8 @@ def run(cfg, final=False, force=False, outdir="results", schemes=None, quiet=Fal
     text = render_text(ex)
     json.dump(ex, open(out / "explanation_latest.json", "w"), indent=1, default=float)
     open(out / "explanation_latest.txt", "w").write(text)
+    from .explain.writer import TemplateWriter
+    open(out / "explanation_plain_english.txt", "w").write(TemplateWriter().write(ex))
     notes = ["Temporary EGX30 data (fixed 31-company list, survivorship bias, prices not verified as adjusted); results are provisional until Bloomberg data replaces it.",
              f"Costs are a PLACEHOLDER ({bps} bps one way) with a sensitivity grid; risk-free rate is a placeholder ({rf}); no EGX30 index benchmark yet.",
              "Fundamental, News and Macro agents are not built yet: momentum_rule and lowvol_rule are labeled stand-ins.",
