@@ -105,10 +105,18 @@ class Runner:
         pcfg, ccfg = cfg["portfolio"], cfg["coordinator"]
         stocks = ds.stocks
         n = len(stocks)
-        wdrift = pd.Series(0.0, index=stocks)
+        wdrift = pd.Series(0.0, index=stocks)   # weights drifted to the TRADE date (accounting only)
+        wdec = pd.Series(0.0, index=stocks)     # weights drifted to the DECISION date (what the optimizer may know)
+        cal_pos = pd.Series(np.arange(len(ds.panel.calendar)), index=ds.panel.calendar)
+        close = ds.panel.close
+        prev_target, prev_entry_px = None, None
         rows, wrows, state = [], {}, {}
         first = True
         for k, d in enumerate(ap.dates):
+            if prev_target is not None:
+                # prices up to the decision date only (trade happens `lag` days later)
+                r_dec = (close.loc[d] / prev_entry_px - 1.0).reindex(stocks).fillna(0.0)
+                wdec = prev_target * (1 + r_dec) / (1 + float((prev_target * r_dec).sum()))
             el = ds.elig.loc[d]
             info = {}
             if scheme in ("equal_weight", "buy_hold", "min_variance"):
@@ -120,7 +128,7 @@ class Runner:
                 else:
                     cv = self.cov(d, names)
                     p2 = dict(pcfg); p2["risk_aversion"] = 1.0
-                    w, oi = optimize(np.zeros(len(names)), cv, wdrift[names].values, p2, cost_bps, first, full=True)
+                    w, oi = optimize(np.zeros(len(names)), cv, wdec[names].values, p2, cost_bps, first, full=True)
                     target = pd.Series(0.0, index=stocks); target[names] = w
                     info = oi
             else:
@@ -135,12 +143,12 @@ class Runner:
                 mu = pcfg["alpha_scale"] * (comb[names].values - 0.5)
                 cv = self.cov(d, names)
                 mu_eff = effective_mu(mu, cv, pcfg)
-                w, oi = optimize(mu_eff, cv, wdrift[names].values, pcfg, cost_bps, first, full=bool(pcfg.get("fully_invested", False)))
+                w, oi = optimize(mu_eff, cv, wdec[names].values, pcfg, cost_bps, first, full=bool(pcfg.get("fully_invested", False)))
                 target = pd.Series(0.0, index=stocks); target[names] = w
                 info = {**info, **oi}
                 if keep_state:
                     state[d] = {"combined": comb, "agent_weights": wts, "info": info, "mu": pd.Series(mu, index=names),
-                                "w_prev": wdrift.copy(), "regime_prob": ap.regime_prob.loc[d].to_dict(),
+                                "w_prev": wdec.copy(), "regime_prob": ap.regime_prob.loc[d].to_dict(),
                                 "regime": int(ap.regime_hard.loc[d])}
             R = ds.fwd_ret.loc[d].reindex(stocks)
             miss = int((R.isna() & (target > 0)).sum())
@@ -153,6 +161,8 @@ class Runner:
                          "n_held": int((target > 1e-6).sum()), "cash": float(1 - target.sum()), "missing_exit": miss})
             wrows[d] = target
             wdrift = target * (1 + R) / (1 + gross)
+            prev_target = target
+            prev_entry_px = close.iloc[int(cal_pos[d]) + ds.lag]
             first = False
         ret = pd.DataFrame(rows).set_index("date")
         return SchemeResult(scheme, cost_bps, ret, pd.DataFrame(wrows).T, state)
