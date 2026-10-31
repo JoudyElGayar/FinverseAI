@@ -18,7 +18,7 @@ Outputs go to `results/<run_id>/` (metrics, returns, weights, explanations, `rep
 
 ## Layout
 - `src/finverse/data` loader, eligibility, labels, features
-- `src/finverse/agents` Technical ML agent + stand-in rule agents
+- `src/finverse/agents` Technical ML agent, Fundamental rule agent, stand-in rule agents
 - `src/finverse/regime` 2-state HMM (filtered probabilities only)
 - `src/finverse/coordinator` reliability + regime-aware weighting
 - `src/finverse/optimizer` long-only portfolio optimizer (cvxpy, scipy fallback)

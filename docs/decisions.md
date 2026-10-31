@@ -9,3 +9,4 @@
 | 6 | Reliability = EW rank-IC on realized outcomes | Pending supervisor sign-off | |
 | 7 | Long-only v1; futures hedge then shorting later | Agreed | short rules on EGX new, no history |
 | 8 | Permission to reuse TradeXAI code granted | Confirmed by team | keep written record |
+| 9 | Fundamental agent = transparent rule composite (ROE, ROA, net margin, NI growth, leverage, earnings yield), equal-weight ranks, fixed a priori | Built | too few annual observations for a fitted model; Bloomberg point-in-time data will replace the lag assumption |

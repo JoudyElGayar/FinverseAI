@@ -15,6 +15,10 @@ from .backtest.metrics import perf, block_bootstrap_diff
 def build_agents(cfg):
     ags = [TechnicalMLAgent(cfg["agents"]["technical_ml"], seed=cfg["backtest"]["seed"])]
     ags += [REGISTRY[n]() for n in cfg["agents"]["standins"]]
+    fc = cfg["agents"].get("fundamental", {})
+    if fc.get("enabled"):
+        from .agents.fundamental import FundamentalRuleAgent
+        ags.append(FundamentalRuleAgent(fc["dir"], fc["publication_lag_months"]))
     return ags
 
 

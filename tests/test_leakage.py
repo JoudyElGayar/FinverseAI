@@ -71,3 +71,36 @@ def test_features_are_causal(small_cfg, tmp_path):
     cut = compute_features(p.close.loc[:t], p.volume.loc[:t])
     for k in full:
         pd.testing.assert_series_equal(full[k].loc[t], cut[k].loc[t], check_names=False, atol=1e-9)
+
+
+def _synth_funds(stocks, seed=0, poison_from_year=None):
+    rng = np.random.default_rng(seed)
+    out = {}
+    for s in stocks:
+        yrs = list(range(2008, 2022))
+        df = pd.DataFrame({"ni": rng.normal(50, 20, len(yrs)), "rev": rng.uniform(300, 500, len(yrs)),
+                           "eps": rng.normal(1, 0.3, len(yrs)), "equity": rng.uniform(200, 400, len(yrs)),
+                           "assets": rng.uniform(500, 900, len(yrs)), "liab": rng.uniform(100, 300, len(yrs))}, index=yrs)
+        if poison_from_year is not None:
+            m = df.index >= poison_from_year
+            df.loc[m, :] = np.random.default_rng(1234).normal(1e6, 1e5, (m.sum(), df.shape[1]))
+        out[s] = df
+    return out
+
+
+def test_fundamental_agent_uses_only_published_years(small_cfg, tmp_path):
+    """Statements for fiscal years not yet published at decision date d (Dec 31 Y + lag > d) must not affect the score."""
+    from finverse.agents.fundamental import FundamentalRuleAgent
+    A = tmp_path / "a"; make_synth(A)
+    cfg = override(small_cfg, **{"data.dir": str(A)})
+    ds = build_dataset(cfg)
+    d = ds.rebal[(ds.rebal >= "2017-06-01")][0]
+    lag = 9
+    ag = FundamentalRuleAgent("unused", lag, funds=_synth_funds(ds.stocks))
+    y = ag._latest_year(d)
+    # poison every year after the latest published one
+    ag2 = FundamentalRuleAgent("unused", lag, funds=_synth_funds(ds.stocks, poison_from_year=y + 1))
+    pd.testing.assert_series_equal(ag.score(ds, d).score, ag2.score(ds, d).score)
+    # and the year itself is NOT available 1 day before Dec 31 + lag
+    assert pd.Timestamp(year=y, month=12, day=31) + pd.DateOffset(months=lag) <= d
+    assert pd.Timestamp(year=y + 1, month=12, day=31) + pd.DateOffset(months=lag) > d

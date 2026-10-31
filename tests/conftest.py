@@ -39,7 +39,7 @@ def small_cfg():
         "backtest.first_test_year": 2016, "backtest.final_holdout_start": "2020-01-01",
         "agents.technical_ml.n_models": 2, "agents.technical_ml.max_iter": 25,
         "regime.n_restarts": 2, "coordinator.min_obs": 6, "coordinator.min_obs_regime": 3,
-        "backtest.bootstrap_reps": 100, "portfolio.backend": "scipy"})
+        "backtest.bootstrap_reps": 100, "portfolio.backend": "scipy", "agents.fundamental.enabled": False})
     return cfg
 
 
