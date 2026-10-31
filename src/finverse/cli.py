@@ -96,6 +96,11 @@ def run(cfg, final=False, force=False, outdir="results", schemes=None, quiet=Fal
              f"Portfolio mode: {'fully invested' if cfg['portfolio'].get('fully_invested') else 'cash allowed'}."]
     build_report(out / "report.html", f"FinVerse AI testbed ({'FINAL holdout' if final else 'development'})",
                  metrics, sens, boot, results, ap, text, notes)
+    from .state.store import StateStore
+    from .state.recorder import record_run
+    store = StateStore(out / "state.sqlite")
+    record_run(store, run_id, ap, results["dynamic"])
+    store.close()
     if final:
         lock.parent.mkdir(parents=True, exist_ok=True)
         lock.write_text(run_id)

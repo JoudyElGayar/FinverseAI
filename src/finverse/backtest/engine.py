@@ -19,6 +19,7 @@ class AgentPanel:
     regime_hard: pd.Series
     ic: pd.DataFrame
     fold_info: list
+    sources: dict = field(default_factory=dict)   # agent -> {date: [source ids]}
 
 
 @dataclass
@@ -45,6 +46,7 @@ def select_test_dates(ds, cfg, final=False) -> pd.DatetimeIndex:
 def run_agents(ds, cfg, agents, test_dates) -> AgentPanel:
     rcfg = cfg["regime"]
     scores = {a.name: [] for a in agents}
+    sources = {a.name: {} for a in agents}
     confs = {a.name: [] for a in agents}
     probs = []
     fold_info = []
@@ -68,6 +70,7 @@ def run_agents(ds, cfg, agents, test_dates) -> AgentPanel:
                 o = a.score(ds, d)
                 scores[a.name].append(o.score.rename(d))
                 confs[a.name].append(o.confidence.rename(d))
+                sources[a.name][d] = list(o.source_ids)
     sc = {k: pd.DataFrame(v) for k, v in scores.items()}
     cf = {k: pd.DataFrame(v) for k, v in confs.items()}
     rp = pd.concat(probs)
@@ -75,7 +78,7 @@ def run_agents(ds, cfg, agents, test_dates) -> AgentPanel:
     hard = pd.Series(rp.values.argmax(axis=1), index=rp.index)
     ic = pd.DataFrame({k: [sc[k].loc[d].corr(ds.label.loc[d], method="spearman") for d in test_dates]
                        for k in sc}, index=test_dates)
-    return AgentPanel(test_dates, sc, cf, rp, hard, ic, fold_info)
+    return AgentPanel(test_dates, sc, cf, rp, hard, ic, fold_info, sources)
 
 
 def _cov(ds, d, cols, window):
