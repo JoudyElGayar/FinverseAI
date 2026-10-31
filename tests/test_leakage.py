@@ -122,3 +122,16 @@ def test_news_agent_ignores_same_day_and_future_articles(small_cfg, tmp_path):
     a0 = NewsSentimentAgent(base).score(ds, d).score
     a1 = NewsSentimentAgent(leak).score(ds, d).score
     pd.testing.assert_series_equal(a0, a1)
+
+
+def test_news_agent_matches_file_style_company_names(small_cfg, tmp_path):
+    """Sentiment files label companies like '01. Palm Hills'; dataset stocks look like 'Palm_Hills'."""
+    from finverse.agents.news import NewsSentimentAgent
+    A = tmp_path / "a"; make_synth(A)
+    ds = build_dataset(override(small_cfg, **{"data.dir": str(A)}))
+    d = ds.rebal[(ds.rebal >= "2017-06-01")][0]
+    rng = np.random.default_rng(1)
+    rows = [{"company": f"{i + 1:02d}. " + s.replace("_", " "), "ts": d - pd.Timedelta(days=3 + j),
+             "sentiment": float(rng.uniform(-1, 1))} for i, s in enumerate(ds.stocks) for j in range(2)]
+    out = NewsSentimentAgent(pd.DataFrame(rows)).score(ds, d)
+    assert out.score.notna().sum() >= len(ds.stocks) // 2

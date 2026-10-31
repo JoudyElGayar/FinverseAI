@@ -8,6 +8,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from .base import Agent, AgentOutput
+from ..data.news import _norm
 
 
 class NewsSentimentAgent(Agent):
@@ -17,6 +18,7 @@ class NewsSentimentAgent(Agent):
         """sentiment: DataFrame[company, ts, sentiment] with sentiment in [-1, 1] (positive minus negative probability)."""
         s = sentiment.copy()
         s["ts"] = pd.to_datetime(s["ts"])
+        s["company"] = s["company"].map(_norm)   # file-name labels -> same key as the dataset stock names
         self.s = s.sort_values("ts").reset_index(drop=True)
         self.window, self.half, self.n_full = window_days, halflife_days, full_conf_articles
 
@@ -35,14 +37,15 @@ class NewsSentimentAgent(Agent):
     def score(self, ds, date) -> AgentOutput:
         mean, cnt = self._stats(date)
         idx = pd.Index(ds.stocks)
-        s = mean.reindex(idx).where(ds.elig.loc[date])
+        keys = pd.Index([_norm(x) for x in idx])
+        s = pd.Series(mean.reindex(keys).values, index=idx).where(ds.elig.loc[date])
         score = s.rank(pct=True)
-        conf = (cnt.reindex(idx) / self.n_full).clip(upper=1.0).where(score.notna())
+        conf = (pd.Series(cnt.reindex(keys).values, index=idx) / self.n_full).clip(upper=1.0).where(score.notna())
         return AgentOutput(self.name, date, score, conf, source_ids=[f"news<{pd.Timestamp(date).date()}"])
 
     def drivers(self, ds, date, stock, top=3):
         d0 = pd.Timestamp(date).normalize()
-        m = (self.s["company"] == stock) & (self.s["ts"] < d0) & (self.s["ts"] >= d0 - pd.Timedelta(days=self.window))
+        m = (self.s["company"] == _norm(stock)) & (self.s["ts"] < d0) & (self.s["ts"] >= d0 - pd.Timedelta(days=self.window))
         w = self.s.loc[m].copy()
         if w.empty:
             return []

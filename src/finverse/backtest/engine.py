@@ -140,16 +140,19 @@ class Runner:
                     wts, info = agent_weights(self.agent_names, ap.ic, ap.regime_hard, ds.label_end.reindex(ap.dates), k, ccfg, scheme)
                     comb = combine({a: ap.scores[a].loc[d] for a in wts}, {a: ap.confs[a].loc[d] for a in wts}, wts)
                 names = [s for s in stocks if el[s] and pd.notna(comb[s])]
-                mu = pcfg["alpha_scale"] * (comb[names].values - 0.5)
-                cv = self.cov(d, names)
-                mu_eff = effective_mu(mu, cv, pcfg)
-                w, oi = optimize(mu_eff, cv, wdec[names].values, pcfg, cost_bps, first, full=bool(pcfg.get("fully_invested", False)))
-                target = pd.Series(0.0, index=stocks); target[names] = w
-                info = {**info, **oi}
-                if keep_state:
-                    state[d] = {"combined": comb, "agent_weights": wts, "info": info, "mu": pd.Series(mu, index=names),
-                                "w_prev": wdec.copy(), "regime_prob": ap.regime_prob.loc[d].to_dict(),
-                                "regime": int(ap.regime_hard.loc[d])}
+                if not names:   # nothing scored this month (e.g. News agent alone before news coverage): hold, no trade
+                    target = wdrift.copy(); info = {"reason": "no_scores_hold"}
+                else:
+                    mu = pcfg["alpha_scale"] * (comb[names].values - 0.5)
+                    cv = self.cov(d, names)
+                    mu_eff = effective_mu(mu, cv, pcfg)
+                    w, oi = optimize(mu_eff, cv, wdec[names].values, pcfg, cost_bps, first, full=bool(pcfg.get("fully_invested", False)))
+                    target = pd.Series(0.0, index=stocks); target[names] = w
+                    info = {**info, **oi}
+                    if keep_state:
+                        state[d] = {"combined": comb, "agent_weights": wts, "info": info, "mu": pd.Series(mu, index=names),
+                                    "w_prev": wdec.copy(), "regime_prob": ap.regime_prob.loc[d].to_dict(),
+                                    "regime": int(ap.regime_hard.loc[d])}
             R = ds.fwd_ret.loc[d].reindex(stocks)
             miss = int((R.isna() & (target > 0)).sum())
             R = R.fillna(0.0)
