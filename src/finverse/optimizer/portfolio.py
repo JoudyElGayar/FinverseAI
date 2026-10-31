@@ -97,3 +97,13 @@ def optimize(mu, cov, w_prev, pcfg: dict, cost_bps: float = 0.0, first_build=Fal
         return w, {"backend": backend, "status": "fallback_keep_previous", "relax": relax}
     w = np.where(w < 1e-6, 0.0, w)
     return w, {"backend": backend, "status": "ok", "relax": relax}
+
+
+def effective_mu(mu, cov, pcfg):
+    """Benchmark-relative mode: maximize mu'(w-b) - gamma (w-b)'S(w-b) with b = equal weight over the eligible names.
+    Expanding the quadratic gives a linear term 2*gamma*S*b, so the same solver is reused (constant terms dropped)."""
+    if not pcfg.get("benchmark_relative", False):
+        return np.asarray(mu, float)
+    n = len(mu)
+    b = np.full(n, 1.0 / n)
+    return np.asarray(mu, float) + 2.0 * pcfg["risk_aversion"] * (np.asarray(cov, float) @ b)

@@ -4,12 +4,12 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from ..coordinator.weights import combine
-from ..optimizer.portfolio import optimize
+from ..optimizer.portfolio import optimize, effective_mu
 
 
 def _weights_from(comb, names, mu_scale, cov, w_prev, pcfg, cost_bps, first):
     mu = mu_scale * (comb[names].values - 0.5)
-    w, _ = optimize(mu, cov, w_prev, pcfg, cost_bps, first, full=bool(pcfg.get("fully_invested", False)))
+    w, _ = optimize(effective_mu(mu, cov, pcfg), cov, w_prev, pcfg, cost_bps, first, full=bool(pcfg.get("fully_invested", False)))
     return pd.Series(w, index=names)
 
 

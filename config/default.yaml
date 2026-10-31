@@ -53,5 +53,6 @@ portfolio:
   min_cash: 0.0
   turnover_cap: 0.6                # one-way sum |dw| per rebalance (first build exempt)
   cov_window_days: 252
+  benchmark_relative: false        # true = tilt around an equal-weight benchmark (tracking-error style)
   fully_invested: false            # true = tilt around a fully invested book (no cash drag)
   backend: auto                    # auto | cvxpy | scipy

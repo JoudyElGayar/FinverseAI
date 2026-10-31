@@ -7,7 +7,7 @@ from sklearn.covariance import LedoitWolf
 
 from ..regime.hmm import GaussianHMM
 from ..coordinator.weights import agent_weights, combine
-from ..optimizer.portfolio import optimize
+from ..optimizer.portfolio import optimize, effective_mu
 
 
 @dataclass
@@ -131,7 +131,8 @@ class Runner:
                 names = [s for s in stocks if el[s] and pd.notna(comb[s])]
                 mu = pcfg["alpha_scale"] * (comb[names].values - 0.5)
                 cv = self.cov(d, names)
-                w, oi = optimize(mu, cv, wdrift[names].values, pcfg, cost_bps, first, full=bool(pcfg.get("fully_invested", False)))
+                mu_eff = effective_mu(mu, cv, pcfg)
+                w, oi = optimize(mu_eff, cv, wdrift[names].values, pcfg, cost_bps, first, full=bool(pcfg.get("fully_invested", False)))
                 target = pd.Series(0.0, index=stocks); target[names] = w
                 info = {**info, **oi}
                 if keep_state:
