@@ -19,6 +19,16 @@ def build_agents(cfg):
     if fc.get("enabled"):
         from .agents.fundamental import FundamentalRuleAgent
         ags.append(FundamentalRuleAgent(fc["dir"], fc["publication_lag_months"]))
+    nc = cfg["agents"].get("news", {})
+    if nc.get("enabled"):
+        from pathlib import Path
+        import pandas as pd
+        from .agents.news import NewsSentimentAgent
+        sf = Path(nc["sentiment_file"])
+        if sf.exists():
+            ags.append(NewsSentimentAgent(pd.read_csv(sf), nc["window_days"], nc["halflife_days"], nc["full_conf_articles"]))
+        else:
+            print(f"news agent enabled but {sf} not found: run scripts/score_news_finbert.py first (skipping News agent)")
     return ags
 
 

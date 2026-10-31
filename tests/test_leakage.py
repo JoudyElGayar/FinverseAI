@@ -104,3 +104,21 @@ def test_fundamental_agent_uses_only_published_years(small_cfg, tmp_path):
     # and the year itself is NOT available 1 day before Dec 31 + lag
     assert pd.Timestamp(year=y, month=12, day=31) + pd.DateOffset(months=lag) <= d
     assert pd.Timestamp(year=y + 1, month=12, day=31) + pd.DateOffset(months=lag) > d
+
+
+def test_news_agent_ignores_same_day_and_future_articles(small_cfg, tmp_path):
+    """Only articles from EARLIER calendar days than the decision date may affect the news score."""
+    from finverse.agents.news import NewsSentimentAgent
+    A = tmp_path / "a"; make_synth(A)
+    cfg = override(small_cfg, **{"data.dir": str(A)})
+    ds = build_dataset(cfg)
+    d = ds.rebal[(ds.rebal >= "2017-06-01")][0]
+    rng = np.random.default_rng(0)
+    rows = [{"company": s, "ts": d - pd.Timedelta(days=int(rng.integers(1, 25))), "sentiment": float(rng.uniform(-1, 1))}
+            for s in ds.stocks for _ in range(3)]
+    base = pd.DataFrame(rows)
+    leak = pd.concat([base, pd.DataFrame([{"company": s, "ts": d + pd.Timedelta(hours=h), "sentiment": 1.0 if i % 2 else -1.0}
+                                          for i, s in enumerate(ds.stocks) for h in (0, 5, 48)])], ignore_index=True)
+    a0 = NewsSentimentAgent(base).score(ds, d).score
+    a1 = NewsSentimentAgent(leak).score(ds, d).score
+    pd.testing.assert_series_equal(a0, a1)
