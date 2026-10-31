@@ -29,6 +29,16 @@ def build_agents(cfg):
             ags.append(NewsSentimentAgent(pd.read_csv(sf), nc["window_days"], nc["halflife_days"], nc["full_conf_articles"]))
         else:
             print(f"news agent enabled but {sf} not found: run scripts/score_news_finbert.py first (skipping News agent)")
+    nm = cfg["agents"].get("news_model", {})
+    if nm.get("enabled"):
+        from pathlib import Path
+        import pandas as pd
+        from .agents.news_model import NewsModelAgent
+        sf = Path(nm["sentiment_file"])
+        if sf.exists():
+            ags.append(NewsModelAgent(pd.read_csv(sf), nm["ridge_alpha"], nm["min_train_rows"], nm["full_conf_articles"]))
+        else:
+            print(f"news_model agent enabled but {sf} not found: run scripts/score_news_finbert.py first (skipping)")
     return ags
 
 
@@ -103,11 +113,14 @@ def run(cfg, final=False, force=False, outdir="results", schemes=None, quiet=Fal
     open(out / "explanation_plain_english.txt", "w").write(TemplateWriter().write(ex))
     notes = ["Temporary EGX30 data (fixed 31-company list, survivorship bias, prices not verified as adjusted); results are provisional until Bloomberg data replaces it.",
              f"Costs are a PLACEHOLDER ({bps} bps one way) with a sensitivity grid; risk-free rate is a placeholder ({rf}); no EGX30 index benchmark yet.",
-             "Fundamental, News and Macro agents are not built yet: momentum_rule and lowvol_rule are labeled stand-ins.",
+             "Macro agent not built yet; News agents are built but off by default (no evidence they help). momentum_rule and lowvol_rule are labeled stand-ins.",
              "Hyperparameters are defaults; the fully_invested choice was made after seeing development results (holdout untouched)." if not final else "FINAL holdout run.",
              f"Portfolio mode: {'fully invested' if cfg['portfolio'].get('fully_invested') else 'cash allowed'}."]
     build_report(out / "report.html", f"FinVerse AI testbed ({'FINAL holdout' if final else 'development'})",
                  metrics, sens, boot, results, ap, text, notes)
+    from .explain.dashboard import build_dashboard
+    build_dashboard(out / "dashboard.html", f"FinVerse AI testbed ({'FINAL holdout' if final else 'development'})",
+                    results, ap, notes)
     from .state.store import StateStore
     from .state.recorder import record_run
     store = StateStore(out / "state.sqlite")

@@ -38,6 +38,12 @@ agents:
     window_days: 30
     halflife_days: 14
     full_conf_articles: 3
+  news_model:                      # walk-forward ridge on article-sentiment features; off by default
+    enabled: false
+    sentiment_file: data/news/sentiment_finbert.csv
+    ridge_alpha: 10.0                # PLACEHOLDER default, not tuned
+    min_train_rows: 100
+    full_conf_articles: 3
   standins: [momentum_rule, lowvol_rule]   # replaced by Fundamental / News / Macro agents later
 
 regime:

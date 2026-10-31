@@ -135,3 +135,48 @@ def test_news_agent_matches_file_style_company_names(small_cfg, tmp_path):
              "sentiment": float(rng.uniform(-1, 1))} for i, s in enumerate(ds.stocks) for j in range(2)]
     out = NewsSentimentAgent(pd.DataFrame(rows)).score(ds, d)
     assert out.score.notna().sum() >= len(ds.stocks) // 2
+
+
+def test_news_model_ignores_future_articles_in_features_and_training(small_cfg, tmp_path):
+    """Poisoning every article dated on/after the decision date must not change the model's score at that date."""
+    from finverse.agents.news_model import NewsModelAgent
+    A = tmp_path / "a"; make_synth(A)
+    ds = build_dataset(override(small_cfg, **{"data.dir": str(A)}))
+    rd = [d for d in ds.rebal if d >= pd.Timestamp("2017-01-01")]
+    T = rd[12]
+    train = [d for d in rd[:11] if pd.notna(ds.label_end[d]) and ds.label_end[d] <= T]
+    rng = np.random.default_rng(2)
+    rows = [{"company": s, "ts": rd[0] - pd.Timedelta(days=60) + pd.Timedelta(days=int(rng.integers(0, (T - rd[0]).days + 260))), "sentiment": float(rng.uniform(-1, 1))}
+            for s in ds.stocks for _ in range(40)]
+    base = pd.DataFrame(rows)
+    fut = base[base["ts"] >= T].copy(); fut["sentiment"] = 1.0 - fut["sentiment"] * 7
+    poisoned = pd.concat([base[base["ts"] < T], fut])
+    outs = []
+    for sent in (base, poisoned):
+        a = NewsModelAgent(sent, min_train_rows=5); a.fit(ds, train); outs.append(a.score(ds, T).score)
+    pd.testing.assert_series_equal(outs[0], outs[1])
+    assert outs[0].notna().sum() > 0
+
+
+def test_macro_asof_uses_release_dates_not_period_ends(tmp_path):
+    from finverse.data.macro import load_macro, macro_asof
+    f = tmp_path / "m.csv"
+    f.write_text("series,period_end,release_date,value\n"
+                 "cpi,2020-01-31,2020-02-10,10\ncpi,2020-02-29,2020-03-10,11\ncpi,2020-02-29,2020-04-01,12\n")
+    m = load_macro(f)
+    a = macro_asof(m, "2020-03-10")          # same-day release is NOT yet usable
+    assert a.loc[0, "value"] == 10
+    b = macro_asof(m, "2020-03-11")
+    assert b.loc[0, "value"] == 11 and b.loc[0, "change"] == 1
+    c = macro_asof(m, "2020-04-02")          # revision released 2020-04-01 now replaces 11
+    assert c.loc[0, "value"] == 12
+    assert macro_asof(m, "2020-01-15").empty
+
+
+def test_macro_loader_rejects_missing_release_dates(tmp_path):
+    import pytest
+    from finverse.data.macro import load_macro
+    f = tmp_path / "m.csv"
+    f.write_text("series,period_end,release_date,value\ncpi,2020-01-31,,10\n")
+    with pytest.raises(ValueError):
+        load_macro(f)
