@@ -1,0 +1,24 @@
+[project]
+name = "finverse"
+version = "0.1.0"
+description = "FinVerse AI: regime-adaptive, reliability-aware multi-agent portfolio decisions for EGX"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "numpy", "pandas", "scipy", "scikit-learn", "pyyaml", "matplotlib",
+  "cvxpy",
+]
+
+[project.optional-dependencies]
+ml = ["lightgbm"]
+dev = ["pytest"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

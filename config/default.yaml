@@ -1,0 +1,52 @@
+# FinVerse default configuration.
+# Every value marked PLACEHOLDER is a design default, not a verified fact.
+data:
+  dir: data/clean_imputed          # cleaned+imputed EGX30 files (temporary until Bloomberg)
+  start: "2016-01-01"              # sensitivity: 2010-01-01
+  end: null                        # null = last date available in the data
+  calendar_min_coverage: 0.5       # a date counts as a trading day if >= this share of listed stocks have a row
+  max_ffill_days: 5
+  min_history_days: 300            # real (non-imputed) observations needed before a stock is eligible
+  max_imputed_share_60d: 0.2       # exclude stocks that were mostly imputed recently
+
+backtest:
+  exec_lag_days: 1                 # decide at close of day t, trade at close of day t+1
+  first_test_year: 2019            # first walk-forward test year (earlier years are training only)
+  final_holdout_start: "2024-01-01"  # last two years: touched once, see --final
+  cost_bps_one_way: 25             # PLACEHOLDER: confirm with a broker; always report a sensitivity grid
+  cost_grid_bps: [0, 25, 50, 100]
+  rf_annual: 0.0                   # PLACEHOLDER: needs T-bill series (Bloomberg)
+  bootstrap_block: 3
+  bootstrap_reps: 2000
+  seed: 7
+
+agents:
+  technical_ml:
+    n_models: 5
+    max_iter: 120
+    learning_rate: 0.05
+    max_depth: 3
+    min_samples_leaf: 40
+  standins: [momentum_rule, lowvol_rule]   # replaced by Fundamental / News / Macro agents later
+
+regime:
+  n_states: 2
+  n_restarts: 5
+
+coordinator:
+  halflife_months: 12
+  min_obs: 12                      # equal weights until this many realized scores exist
+  regime_blend: 0.5                # lambda: share of regime-conditional reliability
+  min_obs_regime: 6
+  softmax_k: 20.0                  # sharpness; tune on development folds only
+  fixed_weights: null              # used by the 'fixed' scheme (dict agent -> weight)
+
+portfolio:
+  alpha_scale: 0.05                # mu_i = alpha_scale * (score_i - 0.5), monthly
+  risk_aversion: 5.0
+  max_position: 0.15
+  min_cash: 0.0
+  turnover_cap: 0.6                # one-way sum |dw| per rebalance (first build exempt)
+  cov_window_days: 252
+  fully_invested: false            # true = tilt around a fully invested book (no cash drag)
+  backend: auto                    # auto | cvxpy | scipy
